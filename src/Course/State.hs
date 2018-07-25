@@ -38,8 +38,7 @@ exec ::
   State s a
   -> s
   -> s
-exec =
-  error "todo: Course.State#exec"
+exec (State f) s = snd (f s)
 
 -- | Run the `State` seeded with `s` and retrieve the resulting value.
 --
@@ -48,8 +47,7 @@ eval ::
   State s a
   -> s
   -> a
-eval =
-  error "todo: Course.State#eval"
+eval (State f) = \s -> (fst . f)(s)
 
 -- | A `State` where the state also distributes into the produced value.
 --
@@ -57,8 +55,7 @@ eval =
 -- (0,0)
 get ::
   State s s
-get =
-  error "todo: Course.State#get"
+get = State (\s -> (s, s))
 
 -- | A `State` where the resulting state is seeded with the given value.
 --
@@ -67,8 +64,24 @@ get =
 put ::
   s
   -> State s ()
-put =
-  error "todo: Course.State#put"
+-- put = State . const . (,) ()
+put s = State (\_ -> ((), s))
+-- It's a bit of a mystery how i constructed this instance and the best way is
+-- to dissect how this was derived. Best to start with the simpler (imo)
+-- expression of `put s = State (\_ -> ((), s))` where State consumes the input
+-- but spews no output; this does the trick with the exception that it ignores
+-- the input and you can best see this contrast by examining the previous
+-- definition of State.
+--
+-- The latter definition i.e. `put = State . const . (, ) ()` is probably more
+-- "complicated" to read and understand in the sense that there is a lot going
+-- on in there; but what it translates down to is really this
+--
+-- State ( const . (,) $ () )  where `const . (,)` gives us a function of the
+-- type `a -> b1 -> b2 -> (a, b2)` and when it consumes `()` it becomes
+-- `b1 -> b2 -> ((), b2)` and when you compose it with State it gives us the
+-- desired result.
+--
 
 -- | Implement the `Functor` instance for `State s`.
 --
@@ -79,8 +92,7 @@ instance Functor (State s) where
     (a -> b)
     -> State s a
     -> State s b
-  (<$>) =
-    error "todo: Course.State#(<$>)"
+  f <$> (State g) = State (\s -> let (newV, newS) = (g s) in (f(newV), newS))
 
 -- | Implement the `Applicative` instance for `State s`.
 --
@@ -97,14 +109,20 @@ instance Applicative (State s) where
   pure ::
     a
     -> State s a
-  pure =
-    error "todo: Course.State pure#instance (State s)"
+  pure a = State (\s -> (a, s))
   (<*>) ::
     State s (a -> b)
     -> State s a
     -> State s b 
-  (<*>) =
-    error "todo: Course.State (<*>)#instance (State s)"
+  (State f) <*> (State g) = State(\s ->
+    let (h, s' ) = f s
+        (v, s'') = g s'
+    in (h v, s'')
+    )
+  --State f) <*> (State g) = State (\s -> let (newV, newS) = (g s) in ( fst (f s) $ newV, newS))
+  --The interesting part of this implementation is that according to the tests,
+  --i have to first process 'f' before 'g' (in a previous implementation which
+  --i have removed since processes 'g' before 'f' and the tests failed.)
 
 -- | Implement the `Bind` instance for `State s`.
 --
@@ -118,8 +136,17 @@ instance Monad (State s) where
     (a -> State s b)
     -> State s a
     -> State s b
-  (=<<) =
-    error "todo: Course.State (=<<)#instance (State s)"
+  f =<< (State g) = State(\s ->
+    let (a', s') = g s
+        (b, s'') = runState (f a') $ s'
+    in (b, s''))
+-- The above is more involved but it should not be hard to see what i am
+-- attempting to do. The harder part is to recognize the expression `runState (f a')`
+-- because the result of `f a'` is a State and i have to invoke runState on
+-- this result to obtain the function embedded within; lastly this embedded
+-- function consumes s' and that's it.
+--
+
 
 -- | Find the first element in a `List` that satisfies a given predicate.
 -- It is possible that no element is found, hence an `Optional` result.
@@ -140,8 +167,15 @@ findM ::
   (a -> f Bool)
   -> List a
   -> f (Optional a)
-findM =
-  error "todo: Course.State#findM"
+findM _ Nil = pure Empty
+findM f (h:.t) = (f h) >>= (\x -> if x then pure (Full h) else findM f t)
+
+
+-- Dissection of this is quite instructive, i find, and what happens here is
+-- that when f is applied to h we have `f Bool` and we know its a Monad and i
+-- can use the bind-operator s.t. i can lift the boolean and decipher that.
+-- If the decipher is True then we lift the `Full h` into the applicative via
+-- `pure` because a Monad is also an Applicative.
 
 -- | Find the first element in a `List` that repeats.
 -- It is possible that no element repeats, hence an `Optional` result.
@@ -154,8 +188,7 @@ firstRepeat ::
   Ord a =>
   List a
   -> Optional a
-firstRepeat =
-  error "todo: Course.State#firstRepeat"
+firstRepeat = error "todo next"
 
 -- | Remove all duplicate elements in a `List`.
 -- /Tip:/ Use `filtering` and `State` with a @Data.Set#Set@.
