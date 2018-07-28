@@ -188,7 +188,12 @@ firstRepeat ::
   Ord a =>
   List a
   -> Optional a
-firstRepeat = error "todo next"
+firstRepeat xs = build xs S.empty
+
+-- A first implementation that doesn't use State nor findM
+build :: Ord a => List a -> S.Set a -> Optional a
+build Nil _ = Empty
+build (h:.t) s = if S.member h s then Full h else build t (S.insert h s)
 
 -- | Remove all duplicate elements in a `List`.
 -- /Tip:/ Use `filtering` and `State` with a @Data.Set#Set@.
@@ -200,8 +205,18 @@ distinct ::
   Ord a =>
   List a
   -> List a
-distinct =
-  error "todo: Course.State#distinct"
+distinct xs = (toList2 . fromList2) xs -- this is a little silly because i'm punching through the list 2 times; hence its not very efficient.
+
+-- in this first implementation, the approach i took is to foldr on the list to
+-- a `Set a` and i wanted another function where i can foldr again on the set
+-- to create the `Course.List`
+fromList2 :: Ord a => List a -> S.Set a
+fromList2 Nil = S.empty
+fromList2 xs = foldRight S.insert S.empty xs
+
+-- simple formulation i thought 
+toList2 :: Ord a => S.Set a -> List a
+toList2 s = foldRight (:.) Nil $ (listh $ (S.toList s))
 
 -- | A happy number is a positive integer, where the sum of the square of its digits eventually reaches 1 after repetition.
 -- In contrast, a sad number (not a happy number) is where the sum of the square of its digits never reaches 1
