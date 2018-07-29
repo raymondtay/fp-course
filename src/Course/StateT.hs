@@ -39,8 +39,7 @@ instance Functor f => Functor (StateT s f) where
     (a -> b)
     -> StateT s f a
     -> StateT s f b
-  (<$>) =
-    error "todo: Course.StateT (<$>)#instance (StateT s f)"
+  f <$> (StateT g) = StateT(\s -> (<$>)(\p -> ((,) ((f . fst) p) (snd p))) (g s))
 
 -- | Implement the `Applicative` instance for @StateT s f@ given a @Monad f@.
 --
@@ -63,14 +62,15 @@ instance Monad f => Applicative (StateT s f) where
   pure ::
     a
     -> StateT s f a
-  pure =
-    error "todo: Course.StateT pure#instance (StateT s f)"
+  pure a = StateT(\s -> return (a, s)) -- the intuition to using 'return' is of the fact that 'f ∈ Monad'
   (<*>) ::
    StateT s f (a -> b)
     -> StateT s f a
     -> StateT s f b
-  (<*>) =
-    error "todo: Course.StateT (<*>)#instance (StateT s f)"
+  (StateT f) <*> (StateT g) = StateT(\s -> do
+    aa <- (g s) -- aa :: (a, s)
+    bb <- (f s) -- bb :: (a -> b, s)
+    return ((fst bb)(fst aa), s))
 
 -- | Implement the `Monad` instance for @StateT s f@ given a @Monad f@.
 -- Make sure the state value is passed through in `bind`.
@@ -85,8 +85,9 @@ instance Monad f => Monad (StateT s f) where
     (a -> StateT s f b)
     -> StateT s f a
     -> StateT s f b
-  (=<<) =
-    error "todo: Course.StateT (=<<)#instance (StateT s f)"
+  f =<< (StateT g) = StateT(\s -> do
+    aa <- (g s) -- aa :: (a, s)
+    runStateT (f (fst aa)) s)
 
 -- | A `State'` is `StateT` specialised to the `ExactlyOne` functor.
 type State' s a =
