@@ -96,7 +96,7 @@ optional ::
   -> b
   -> Optional a
   -> b
-optional f b oa = case f <$> oa of
+optional f b oa = case f P.<$> oa of
                       Empty -> b
                       Full v -> v
 
