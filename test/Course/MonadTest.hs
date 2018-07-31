@@ -9,7 +9,7 @@ import           Test.Tasty.HUnit  (testCase, (@?=))
 import           Course.Core
 import           Course.ExactlyOne (ExactlyOne (..))
 import           Course.List       (List (..))
-import           Course.Monad      (join, (<**>), (=<<), (>>=), (<=<))
+import           Course.Monad      (join, join2, join3, (<**>), (=<<), (>>=), (<=<))
 import           Course.Optional   (Optional (..))
 
 test_Monad :: TestTree
@@ -21,6 +21,8 @@ test_Monad =
   , bindReaderTest
   , appTest
   , joinTest
+  , join2Test
+  , join3Test
   , bindFlippedTest
   , kleisliCompositionTest
   ]
@@ -81,6 +83,28 @@ joinTest =
       join (Full (Full 7)) @?= Full 7
   , testCase "(->)" $
       join (+) 7 @?= 14
+  ]
+
+join2Test :: TestTree
+join2Test =
+  testGroup "join2" [
+    testCase "List" $
+      join2 (((1 :. 2 :. 3 :. Nil) :. (1 :. 2 :. Nil) :. Nil) :. Nil) @?= (1:.2:.3:.1:.2:.Nil)
+  , testCase "Optional with Empty" $
+      join2 (Full (Full Empty)) @?= (Empty :: Optional Integer)
+  , testCase "Optional all Full" $
+      join2 (Full (Full (Full 7))) @?= Full 7
+  ]
+
+join3Test :: TestTree
+join3Test =
+  testGroup "join3" [
+    testCase "List" $
+      join3 ((((1 :. 2 :. 3 :. Nil) :. (1 :. 2 :. Nil) :. Nil):.Nil):.Nil) @?= (1:.2:.3:.1:.2:.Nil)
+  , testCase "Optional with Empty" $
+      join3 (Full (Full (Full Empty))) @?= (Empty :: Optional Integer)
+  , testCase "Optional all Full" $
+      join3 (Full (Full (Full (Full 7)))) @?= Full 7
   ]
 
 bindFlippedTest :: TestTree
