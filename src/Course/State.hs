@@ -188,8 +188,10 @@ firstRepeat ::
   Ord a =>
   List a
   -> Optional a
-firstRepeat xs = build xs S.empty
+firstRepeat xs = let p e = (\s -> (const $ pure (S.member e s)) =<< put(S.insert e s)) =<< get
+                 in fst (runState (findM p $ xs) S.empty)
 
+-- firstRepeat xs = build xs S.empty
 -- A first implementation that doesn't use State nor findM
 build :: Ord a => List a -> S.Set a -> Optional a
 build Nil _ = Empty
