@@ -176,8 +176,8 @@ distinct' ::
   (Ord a, Num a) =>
   List a
   -> List a
-distinct' =
-  error "todo: Course.StateT#distinct'"
+distinct' xs = let p e = (\s -> (const $ pure (S.member e s)) =<< put(S.insert e s)) =<< get
+               in listh . (S.toList) . snd $ runState (filtering p $ xs) S.empty
 
 -- | Remove all duplicate elements in a `List`.
 -- However, if you see a value greater than `100` in the list,
@@ -194,8 +194,15 @@ distinctF ::
   (Ord a, Num a) =>
   List a
   -> Optional (List a)
-distinctF =
-  error "todo: Course.StateT#distinctF"
+distinctF xs = let p e = (\s -> (const $ pure (if e > 100 then True else False)) =<< putT(S.insert e s)) =<< getT 
+               in (<$>) fst $ runStateT (filtering p $ xs) S.empty
+
+-- Its instructive to see where the differences are w.r.t `distinctF` and
+-- `distinctF'`.
+distinctF' xs = let p e = (\s -> (const $ pure (if e > 100 then True else False)) =<< put(S.insert e s)) =<< get
+               in case (runState (filtering p $ xs) S.empty) of
+                      (Nil, aa) -> Full (listh . S.toList $ aa)
+                      (_,_) -> Empty
 
 -- | An `OptionalT` is a functor of an `Optional` value.
 data OptionalT f a =
@@ -209,8 +216,7 @@ data OptionalT f a =
 -- >>> runOptionalT $ (+1) <$> OptionalT (Full 1 :. Empty :. Nil)
 -- [Full 2,Empty]
 instance Functor f => Functor (OptionalT f) where
-  (<$>) =
-    error "todo: Course.StateT (<$>)#instance (OptionalT f)"
+  (<$>) f (OptionalT o) = OptionalT $ (<$>) f <$> o
 
 -- | Implement the `Applicative` instance for `OptionalT f` given a Monad f.
 --
@@ -237,18 +243,19 @@ instance Functor f => Functor (OptionalT f) where
 -- >>> runOptionalT $ OptionalT (Full (+1) :. Full (+2) :. Nil) <*> OptionalT (Full 1 :. Empty :. Nil)
 -- [Full 2,Empty,Full 3,Empty]
 instance Monad f => Applicative (OptionalT f) where
-  pure =
-    error "todo: Course.StateT pure#instance (OptionalT f)"
-  (<*>) =
-    error "todo: Course.StateT (<*>)#instance (OptionalT f)"
+  pure = OptionalT . pure . pure -- there's 2 layers involved here
+  (OptionalT f) <*> (OptionalT g) = OptionalT( lift2 (<*>) f g )
 
 -- | Implement the `Monad` instance for `OptionalT f` given a Monad f.
 --
 -- >>> runOptionalT $ (\a -> OptionalT (Full (a+1) :. Full (a+2) :. Nil)) =<< OptionalT (Full 1 :. Empty :. Nil)
 -- [Full 2,Full 3,Empty]
 instance Monad f => Monad (OptionalT f) where
-  (=<<) =
-    error "todo: Course.StateT (=<<)#instance (OptionalT f)"
+  -- =<< :: (a -> f b) -> f a -> f b
+  (=<<) f (OptionalT m) = OptionalT((\v -> case v of
+                                               Empty -> pure Empty
+                                               Full e -> runOptionalT (f e)
+                                    ) =<< m)
 
 -- | A `Logger` is a pair of a list of log values (`[l]`) and an arbitrary value (`a`).
 data Logger l a =
@@ -260,8 +267,7 @@ data Logger l a =
 -- >>> (+3) <$> Logger (listh [1,2]) 3
 -- Logger [1,2] 6
 instance Functor (Logger l) where
-  (<$>) =
-    error "todo: Course.StateT (<$>)#instance (Logger l)"
+  f <$> (Logger l a) = Logger l (f a)
 
 -- | Implement the `Applicative` instance for `Logger`.
 --
@@ -271,19 +277,24 @@ instance Functor (Logger l) where
 -- >>> Logger (listh [1,2]) (+7) <*> Logger (listh [3,4]) 3
 -- Logger [1,2,3,4] 10
 instance Applicative (Logger l) where
-  pure =
-    error "todo: Course.StateT pure#instance (Logger l)"
-  (<*>) =
-    error "todo: Course.StateT (<*>)#instance (Logger l)"
+  pure = Logger (Nil)
+  (<*>) (Logger xs f) (Logger ys b) = Logger (xs ++ ys) (f b)
 
 -- | Implement the `Monad` instance for `Logger`.
 -- The `bind` implementation must append log values to maintain associativity.
 --
 -- >>> (\a -> Logger (listh [4,5]) (a+3)) =<< Logger (listh [1,2]) 3
 -- Logger [1,2,4,5] 6
+-- >> :t (=<<)
+-- (=<<) :: Monad f => (a -> f b) -> f a -> f b
+-- the type signatures definitely helped me in understanding this because what
+-- happens here is that when `f m` is applied, it returns a Monad which is
+-- really some `Logger l a` where i need to merge `l` and `ys` and depending on
+-- the unit tests, i am to treat `ys` infront of `l` and i guess there really
+-- isn't some kind of law that governs this.
 instance Monad (Logger l) where
-  (=<<) =
-    error "todo: Course.StateT (=<<)#instance (Logger l)"
+  (=<<) f (Logger ys m) = case (f m) of
+                              Logger xs a -> Logger (ys ++ xs) a
 
 -- | A utility function for producing a `Logger` with one log value.
 --
