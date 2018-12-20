@@ -116,6 +116,9 @@ runState' ::
 runState' sa s = runExactlyOne $ (runStateT sa) s
 
 -- | Run the `StateT` seeded with `s` and retrieve the resulting state.
+--
+-- >>> execT (StateT $ \s -> Full ((), s + 1)) 2
+-- Full 3
 execT ::
   Functor f =>
   StateT s f a
@@ -123,7 +126,10 @@ execT ::
   -> f s
 execT (StateT k) s = (<$>) snd (k s)
 
--- | Run the `State` seeded with `s` and retrieve the resulting state.
+-- | Run the `State'` seeded with `s` and retrieve the resulting state.
+--
+-- >>> exec' (state' $ \s -> ((), s + 1)) 2
+-- 3
 exec' ::
   State' s a
   -> s
@@ -131,6 +137,9 @@ exec' ::
 exec' (StateT k) s = snd . runExactlyOne $ (k s)
 
 -- | Run the `StateT` seeded with `s` and retrieve the resulting value.
+--
+-- >>> evalT (StateT $ \s -> Full (even s, s + 1)) 2
+-- Full True
 evalT ::
   Functor f =>
   StateT s f a
@@ -139,6 +148,9 @@ evalT ::
 evalT (StateT k) s = fst <$> (k s)
 
 -- | Run the `State'` seeded with `s` and retrieve the resulting value.
+--
+-- >>> eval' (state' $ \s -> (even s, s + 1)) 5
+-- False
 eval' ::
   State' s a
   -> s
